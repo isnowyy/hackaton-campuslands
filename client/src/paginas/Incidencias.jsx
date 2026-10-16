@@ -213,6 +213,56 @@ function CambioEstado({ incidencia, estado, alCerrar, alGuardar }) {
   );
 }
 
+// Edición de los datos del reporte (título, descripción, espacio, equipo).
+// El servidor rechaza editar una incidencia cerrada o cancelada (R6) y valida
+// que el espacio y el equipo existan.
+function EditarDatosIncidencia({ incidencia, alCerrar, alGuardar }) {
+  const espacios = useDatos(() => api('/espacios'), []);
+  const equipos = useDatos(() => api('/equipos'), []);
+  const [datos, setDatos] = useState({
+    titulo: incidencia.titulo,
+    descripcion: incidencia.descripcion,
+    espacio_id: incidencia.espacio_id ?? '',
+    equipo_id: incidencia.equipo_id ?? '',
+    reportado_por: incidencia.reportado_por ?? '',
+  });
+  const { enviando, error, ejecutar } = useAccion();
+  const cambiar = (campo) => (e) => setDatos({ ...datos, [campo]: e.target.value });
+  const guardar = (e) => {
+    e.preventDefault();
+    ejecutar(() => api(`/incidencias/${encodeURIComponent(incidencia.id)}`, { metodo: 'PATCH', cuerpo: datos })).then(alGuardar);
+  };
+  return (
+    <form className="tarjeta tarjeta-cuerpo formulario" onSubmit={guardar}>
+      <strong>Editar datos del reporte</strong>
+      <MensajeError error={error} />
+      <div className="formulario-2">
+        <Campo etiqueta="Título"><input value={datos.titulo} onChange={cambiar('titulo')} required maxLength={120} /></Campo>
+        <Campo etiqueta="Reportado por"><input value={datos.reportado_por} onChange={cambiar('reportado_por')} maxLength={120} /></Campo>
+      </div>
+      <Campo etiqueta="Descripción"><textarea value={datos.descripcion} onChange={cambiar('descripcion')} required maxLength={4000} /></Campo>
+      <div className="formulario-2">
+        <Campo etiqueta="Espacio relacionado">
+          <select value={datos.espacio_id} onChange={cambiar('espacio_id')}>
+            <option value="">Ninguno</option>
+            {espacios.datos?.map((e) => <option key={e.id} value={e.id}>{e.nombre} ({e.id})</option>)}
+          </select>
+        </Campo>
+        <Campo etiqueta="Equipo relacionado">
+          <select value={datos.equipo_id} onChange={cambiar('equipo_id')}>
+            <option value="">Ninguno</option>
+            {equipos.datos?.map((e) => <option key={e.id} value={e.id}>{e.nombre} ({e.id})</option>)}
+          </select>
+        </Campo>
+      </div>
+      <div className="fila-flex">
+        <button className="boton boton-primario" disabled={enviando}>{enviando ? 'Guardando…' : 'Guardar cambios'}</button>
+        <button type="button" className="boton" onClick={alCerrar}>Cancelar</button>
+      </div>
+    </form>
+  );
+}
+
 function DetalleIncidencia({ id, alCerrar, alCambiar }) {
   const { transiciones_incidencia, categorias } = useCatalogos();
   const etiqueta = useEtiqueta();
@@ -220,6 +270,7 @@ function DetalleIncidencia({ id, alCerrar, alCambiar }) {
   const { datos: inc, error, recargar } = useDatos(() => api(`/incidencias/${encodeURIComponent(id)}`), [id]);
   const [clasificacion, setClasificacion] = useState(null);
   const [estadoDestino, setEstadoDestino] = useState(null);
+  const [editando, setEditando] = useState(false);
   const ia = useAccion();
   const accion = useAccion();
 
@@ -228,6 +279,7 @@ function DetalleIncidencia({ id, alCerrar, alCambiar }) {
     avisar('exito', mensaje);
     setClasificacion(null);
     setEstadoDestino(null);
+    setEditando(false);
     recargar();
     alCambiar();
   };
@@ -252,7 +304,9 @@ function DetalleIncidencia({ id, alCerrar, alCambiar }) {
         {inc.prioridad && <Insignia valor={inc.prioridad} texto={`Prioridad ${etiqueta(inc.prioridad).toLowerCase()}`} />}
         {inc.origen_clasificacion && <Insignia valor={inc.origen_clasificacion} texto={ETIQUETA_ORIGEN[inc.origen_clasificacion]} />}
         <span className="secundario">Creada {formatearFecha(inc.creado_en)}{inc.reportado_por ? ` por ${inc.reportado_por}` : ''}</span>
+        {!final && !editando && <button className="boton boton-pequeno" onClick={() => setEditando(true)}>Editar datos</button>}
       </div>
+      {editando && <EditarDatosIncidencia incidencia={inc} alCerrar={() => setEditando(false)} alGuardar={tras('Datos de la incidencia actualizados')} />}
       <p className="texto-largo">{inc.descripcion}</p>
       <dl className="definiciones">
         <dt>Categoría</dt><dd>{categorias[inc.categoria]?.etiqueta ?? '—'}</dd>
