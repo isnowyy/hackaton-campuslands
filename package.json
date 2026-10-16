@@ -10,7 +10,10 @@
     "build": "npm --prefix client run build",
     "start": "npm run build && npm --prefix server start",
     "test": "npm --prefix server test",
-    "importar": "npm --prefix server run importar --"
+    "importar": "npm --prefix server run importar --",
+    "probar-ia": "npm --prefix server run probar-ia"
   },
-  "engines": { "node": ">=22.13" }
+  "engines": {
+    "node": ">=22.13"
+  }
 }

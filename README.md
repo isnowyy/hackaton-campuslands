@@ -38,6 +38,7 @@ Otros comandos:
 |---|---|
 | `npm test` | Pruebas automáticas de las 6 reglas, los flujos, la IA y el importador |
 | `npm start` | Compila la interfaz y la sirve desde el mismo servidor en el puerto 3000 |
+| `npm run probar-ia` | Hace una consulta real de triaje con la IA del `.env` y muestra la respuesta validada o el error exacto |
 | `npm run importar` | Vista previa del análisis de los datos oficiales (no escribe nada) |
 | `npm run importar -- --aplicar` | Importa los registros válidos |
 
