@@ -138,9 +138,21 @@ queda desactivada y la aplicación lo dice.
 | `IA_PROVEEDOR` | Uso | Variables |
 |---|---|---|
 | `anthropic` | API de Claude con el SDK oficial `@anthropic-ai/sdk` y salidas estructuradas (JSON Schema). Con modelos que lo admiten activa el respaldo automático del servidor ante un rechazo del modelo. | `IA_MODELO`, `IA_API_KEY` |
-| `openai_compatible` | Cualquier endpoint `/chat/completions` autorizado (p. ej. un modelo local con Ollama o LM Studio) | `IA_URL_BASE`, `IA_MODELO`, `IA_API_KEY` (opcional) |
+| `openai_compatible` | Cualquier endpoint `/chat/completions` autorizado: Google Gemini, OpenAI, Groq o un modelo local (Ollama, LM Studio). Pide la salida con JSON Schema y permite fijar el esfuerzo de razonamiento. | `IA_URL_BASE`, `IA_MODELO`, `IA_API_KEY` (opcional solo en modelos locales), `IA_ESFUERZO`, `IA_FORMATO_JSON`, `IA_TEMPERATURA` |
 
 **Usar solo el proveedor que la organización autorice durante la competencia.**
+
+Configuración usada en la hackatón (Google Gemini, clave de [Google AI Studio](https://aistudio.google.com/apikey)):
+
+```
+IA_PROVEEDOR=openai_compatible
+IA_MODELO=gemini-3.8-flash
+IA_URL_BASE=https://generativelanguage.googleapis.com/v1beta/openai
+IA_ESFUERZO=low
+IA_API_KEY=        # la clave va solo en .env, nunca en el repositorio
+```
+
+Con Gemini 3 no se envía `temperature` (Google recomienda el valor por defecto en sus modelos con razonamiento) y `IA_ESFUERZO=low` reduce la latencia. `npm run probar-ia` confirma la conexión con una consulta real.
 
 **Controles (`server/src/ia/triaje.js`):**
 

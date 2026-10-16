@@ -14,6 +14,10 @@ export function leerConfiguracionIA(entorno = process.env) {
     urlBase: (entorno.IA_URL_BASE || '').trim().replace(/\/+$/, ''),
     timeoutMs: Math.min(Math.max(Number(entorno.IA_TIMEOUT_MS) || 25000, 3000), 120000),
     limitePorMinuto: Math.max(Number(entorno.IA_LIMITE_POR_MINUTO) || 15, 1),
+    // Solo para openai_compatible (ver proveedorCompatibleOpenAI.js).
+    esfuerzo: (entorno.IA_ESFUERZO || '').trim().toLowerCase() || null,
+    formatoJson: (entorno.IA_FORMATO_JSON || 'json_schema').trim().toLowerCase(),
+    temperatura: entorno.IA_TEMPERATURA && !Number.isNaN(Number(entorno.IA_TEMPERATURA)) ? Number(entorno.IA_TEMPERATURA) : null,
   };
 
   let motivo = null;
@@ -23,6 +27,10 @@ export function leerConfiguracionIA(entorno = process.env) {
   else if (proveedor === 'anthropic' && !config.apiKey) motivo = 'Falta IA_API_KEY para el proveedor anthropic.';
   else if (proveedor === 'openai_compatible' && !config.urlBase) {
     motivo = 'Falta IA_URL_BASE (endpoint autorizado compatible con /chat/completions).';
+  } else if (proveedor === 'openai_compatible' && !config.apiKey && !/^https?:\/\/(127\.0\.0\.1|localhost)/.test(config.urlBase)) {
+    motivo = 'Falta IA_API_KEY (solo un modelo local puede funcionar sin clave).';
+  } else if (!['json_schema', 'json_object', 'ninguno'].includes(config.formatoJson)) {
+    motivo = `IA_FORMATO_JSON="${config.formatoJson}" no es válido. Usa json_schema, json_object o ninguno.`;
   }
 
   return { ...config, configurada: !motivo, motivo };
