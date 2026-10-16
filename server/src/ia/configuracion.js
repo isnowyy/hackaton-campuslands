@@ -15,6 +15,7 @@ export function leerConfiguracionIA(entorno = process.env) {
     timeoutMs: Math.min(Math.max(Number(entorno.IA_TIMEOUT_MS) || 25000, 3000), 120000),
     limitePorMinuto: Math.max(Number(entorno.IA_LIMITE_POR_MINUTO) || 15, 1),
     // Solo para openai_compatible (ver proveedorCompatibleOpenAI.js).
+    modelosRespaldo: (entorno.IA_MODELO_RESPALDO || '').split(',').map((m) => m.trim()).filter(Boolean),
     esfuerzo: (entorno.IA_ESFUERZO || '').trim().toLowerCase() || null,
     formatoJson: (entorno.IA_FORMATO_JSON || 'json_schema').trim().toLowerCase(),
     temperatura: entorno.IA_TEMPERATURA && !Number.isNaN(Number(entorno.IA_TEMPERATURA)) ? Number(entorno.IA_TEMPERATURA) : null,
@@ -43,6 +44,7 @@ export function estadoPublicoIA(config) {
     proveedor: config.proveedor || null,
     modelo: config.modelo || null,
     motivo: config.motivo,
+    modelos_respaldo: config.modelosRespaldo,
     timeout_ms: config.timeoutMs,
   };
 }

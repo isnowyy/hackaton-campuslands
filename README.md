@@ -146,19 +146,23 @@ Configuración usada en la hackatón (Google Gemini, clave de [Google AI Studio]
 
 ```
 IA_PROVEEDOR=openai_compatible
-IA_MODELO=gemini-3.8-flash
+IA_MODELO=gemini-3.6-flash
+IA_MODELO_RESPALDO=gemini-3.5-flash-lite,gemini-3.8-flash
 IA_URL_BASE=https://generativelanguage.googleapis.com/v1beta/openai
 IA_ESFUERZO=low
+IA_TIMEOUT_MS=40000
 IA_API_KEY=        # la clave va solo en .env, nunca en el repositorio
 ```
 
-Con Gemini 3 no se envía `temperature` (Google recomienda el valor por defecto en sus modelos con razonamiento) y `IA_ESFUERZO=low` reduce la latencia. `npm run probar-ia` confirma la conexión con una consulta real.
+- Con Gemini 3 no se envía `temperature` (Google recomienda el valor por defecto en sus modelos con razonamiento) y `IA_ESFUERZO=low` reduce la latencia.
+- **Modelos de respaldo:** en el nivel gratuito, Gemini responde a veces `503 UNAVAILABLE` ("high demand"). Si el modelo principal está saturado (503) o sin cuota (429), se prueba el siguiente de `IA_MODELO_RESPALDO` dentro del mismo tiempo máximo. La tarjeta de la sugerencia muestra qué modelo respondió y cuál falló. Un error de clave no se reintenta con otro modelo.
+- `npm run probar-ia` confirma la conexión con una consulta real.
 
 **Controles (`server/src/ia/triaje.js`):**
 
 - **Tiempo de espera** configurable (`IA_TIMEOUT_MS`) y límite de consultas por minuto (`IA_LIMITE_POR_MINUTO`).
 - **Validación estricta de la respuesta:** JSON válido; categoría, prioridad y área dentro del catálogo; justificación y acciones presentes; confianza entre 0 y 1. Si falla, se responde `respuesta_invalida`, se muestra el error y la respuesta recibida, y no se toca la incidencia.
-- **Errores tipificados:** `no_configurada`, `tiempo_agotado`, `sin_conexion`, `credenciales`, `limite_proveedor`, `rechazo_modelo`, `respuesta_truncada`, `respuesta_invalida`. Cada uno tiene un mensaje claro y la interfaz ofrece continuar con la clasificación manual.
+- **Errores tipificados:** `no_configurada`, `tiempo_agotado`, `sin_conexion`, `credenciales`, `limite_proveedor`, `proveedor_saturado`, `rechazo_modelo`, `respuesta_truncada`, `respuesta_invalida`. Cada uno tiene un mensaje claro y la interfaz ofrece continuar con la clasificación manual.
 - **Separación IA / reglas:** la IA no escribe en la base ni aprueba nada. Su sugerencia se evalúa contra la regla R6 y se muestra si la cumple; aplicarla es una acción de una persona y pasa por las mismas validaciones del backend.
 - **Trazabilidad del origen:** cada clasificación queda marcada como `ia` (aceptada tal cual), `ia_editada` (una persona la modificó), `manual` u `oficial`. El servidor decide el origen comparando con la sugerencia que él mismo guardó, sin confiar en lo que diga el navegador.
 - **Texto del usuario como datos:** la descripción se delimita y se escapa en el mensaje al modelo, y las instrucciones le indican ignorar órdenes contenidas en ella.

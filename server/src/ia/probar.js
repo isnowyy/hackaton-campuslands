@@ -19,6 +19,7 @@ try {
     titulo: 'Proyector no enciende',
     descripcion: 'El proyector del aula 101 no enciende desde esta mañana y hay clase a las 10:00 con 28 campers.',
   });
+  if (resultado.aviso) console.log(`\nAviso: ${resultado.aviso}`);
   console.log(`\nRespuesta válida en ${resultado.duracion_ms} ms (modelo ${resultado.modelo}):`);
   console.log(JSON.stringify(resultado.sugerencia, null, 2));
   console.log(`\nCumple reglas de negocio: ${resultado.validacion_reglas.cumple ? 'sí' : `no (${resultado.validacion_reglas.mensaje})`}`);

@@ -8,6 +8,7 @@ const MENSAJES = {
   sin_conexion: 'No fue posible conectar con el servicio de IA.',
   credenciales: 'El servicio de IA rechazó las credenciales configuradas.',
   limite_proveedor: 'El proveedor de IA está limitando las solicitudes (rate limit).',
+  proveedor_saturado: 'El modelo de IA está saturado en este momento (alta demanda). Suele ser temporal.',
   solicitud_rechazada: 'El proveedor de IA rechazó la solicitud.',
   rechazo_modelo: 'El modelo se negó a responder esta solicitud.',
   respuesta_truncada: 'La respuesta de la IA llegó incompleta.',
@@ -21,6 +22,7 @@ const ESTADO_HTTP = {
   tiempo_agotado: 504,
   sin_conexion: 503,
   limite_proveedor: 503,
+  proveedor_saturado: 503,
 };
 
 export class IAError extends Error {

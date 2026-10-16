@@ -78,6 +78,34 @@ describe('Proveedor compatible con OpenAI (Gemini)', () => {
     await assert.rejects(solicitarCompatibleOpenAI({ config: configurar(), sistema: 's', usuario: 'u' }), (e) => e.codigo === 'respuesta_truncada');
   });
 
+  test('modelo principal saturado (503) -> responde el de respaldo y se avisa', async () => {
+    responder = (res) => {
+      if (ultimaPeticion.cuerpo.model === 'gemini-3.8-flash') return json(503, [{ error: { code: 503, status: 'UNAVAILABLE' } }])(res);
+      json(200, { model: ultimaPeticion.cuerpo.model, choices: [{ finish_reason: 'stop', message: { content: '{}' } }] })(res);
+    };
+    const r = await solicitarCompatibleOpenAI({ config: configurar({ IA_MODELO_RESPALDO: 'gemini-3.6-flash' }), sistema: 's', usuario: 'u' });
+    assert.equal(r.modelo, 'gemini-3.6-flash');
+    assert.match(r.aviso, /gemini-3\.8-flash \(proveedor_saturado\)/);
+  });
+
+  test('todos los modelos saturados -> proveedor_saturado; error de clave no prueba otros modelos', async () => {
+    responder = json(503, [{ error: { code: 503 } }]);
+    await assert.rejects(
+      solicitarCompatibleOpenAI({ config: configurar({ IA_MODELO_RESPALDO: 'gemini-3.6-flash' }), sistema: 's', usuario: 'u' }),
+      (e) => e.codigo === 'proveedor_saturado',
+    );
+    const modelosPedidos = [];
+    responder = (res) => {
+      modelosPedidos.push(ultimaPeticion.cuerpo.model);
+      json(400, [{ error: { message: 'API key not valid.' } }])(res);
+    };
+    await assert.rejects(
+      solicitarCompatibleOpenAI({ config: configurar({ IA_MODELO_RESPALDO: 'gemini-3.6-flash' }), sistema: 's', usuario: 'u' }),
+      (e) => e.codigo === 'credenciales',
+    );
+    assert.deepEqual(modelosPedidos, ['gemini-3.8-flash']);
+  });
+
   test('sin respuesta a tiempo -> tiempo_agotado', async () => {
     responder = (res) => setTimeout(() => json(200, { choices: [] })(res), 4000);
     const config = { ...configurar(), timeoutMs: 200 };

@@ -67,7 +67,7 @@ export function crearServicioIncidencias(db, { reloj = ahoraLocal, triaje } = {}
     db.prepare(
       'UPDATE incidencias SET ia_sugerencia = ?, ia_modelo = ?, ia_generada_en = ?, ia_decision = ?, actualizado_en = ? WHERE id = ?',
     ).run(
-      JSON.stringify({ ...resultado.sugerencia, validacion_reglas: resultado.validacion_reglas, proveedor: resultado.proveedor }),
+      JSON.stringify({ ...resultado.sugerencia, validacion_reglas: resultado.validacion_reglas, proveedor: resultado.proveedor, aviso: resultado.aviso }),
       resultado.modelo,
       resultado.generada_en,
       decision,

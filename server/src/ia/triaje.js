@@ -161,7 +161,7 @@ export function crearTriaje({ entorno = process.env, solicitar } = {}) {
       const llamar =
         solicitar ?? (config.proveedor === 'anthropic' ? solicitarAnthropic : solicitarCompatibleOpenAI);
       const inicio = Date.now();
-      const { texto, modelo } = await llamar({
+      const { texto, modelo, aviso } = await llamar({
         config,
         sistema: construirInstrucciones(),
         usuario: construirMensaje({ titulo, descripcion, espacio, equipo }),
@@ -185,6 +185,8 @@ export function crearTriaje({ entorno = process.env, solicitar } = {}) {
         validacion_reglas: evaluarContraReglas(sugerencia),
         proveedor: config.proveedor,
         modelo,
+        // Si respondió un modelo de respaldo, se dice cuál falló y por qué.
+        aviso: aviso ?? null,
         generada_en: ahoraLocal(),
         duracion_ms: Date.now() - inicio,
       };

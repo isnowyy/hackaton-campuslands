@@ -51,7 +51,7 @@ function CamposClasificacion({ valor, alCambiar, conAsignado = false }) {
 
 // Tarjeta de la sugerencia de IA: siempre identificada como generada por un
 // modelo, con modelo, fecha, confianza y verificación contra las reglas.
-function SugerenciaIA({ sugerencia, modelo, generadaEn, validacion, decision, children }) {
+function SugerenciaIA({ sugerencia, modelo, generadaEn, validacion, decision, aviso, children }) {
   const etiqueta = useEtiqueta();
   const { categorias } = useCatalogos();
   return (
@@ -69,6 +69,7 @@ function SugerenciaIA({ sugerencia, modelo, generadaEn, validacion, decision, ch
           Confianza <span className="medidor"><span style={{ width: `${Math.round(sugerencia.confianza * 100)}%` }} /></span> {Math.round(sugerencia.confianza * 100)}%
         </span>
       </div>
+      {aviso && <p className="secundario" style={{ margin: 0 }}>⚠ {aviso}</p>}
       <p style={{ margin: 0 }}>{sugerencia.justificacion}</p>
       <div>
         <strong>Ruta de atención recomendada</strong>
@@ -166,7 +167,7 @@ function NuevaIncidencia({ alCerrar, alGuardar }) {
       </div>
       <ErrorIA error={ia.error} />
       {triaje && (
-        <SugerenciaIA sugerencia={triaje.sugerencia} modelo={triaje.modelo} generadaEn={triaje.generada_en} validacion={triaje.validacion_reglas}>
+        <SugerenciaIA sugerencia={triaje.sugerencia} modelo={triaje.modelo} generadaEn={triaje.generada_en} validacion={triaje.validacion_reglas} aviso={triaje.aviso}>
           <button type="button" className="boton boton-pequeno boton-primario" onClick={usarSugerencia}>Copiar al formulario</button>
           <button type="button" className="boton boton-pequeno" onClick={() => setTriaje(null)}>Descartar</button>
         </SugerenciaIA>
@@ -276,7 +277,7 @@ function DetalleIncidencia({ id, alCerrar, alCambiar }) {
       )}
       <ErrorIA error={ia.error} />
       {sugerencia && (
-        <SugerenciaIA sugerencia={sugerencia} modelo={inc.ia_modelo} generadaEn={inc.ia_generada_en} validacion={sugerencia.validacion_reglas} decision={inc.ia_decision}>
+        <SugerenciaIA sugerencia={sugerencia} modelo={inc.ia_modelo} generadaEn={inc.ia_generada_en} validacion={sugerencia.validacion_reglas} decision={inc.ia_decision} aviso={sugerencia.aviso}>
           {inc.ia_decision === 'pendiente' && editable && (
             <>
               <button className="boton boton-pequeno boton-primario" disabled={accion.enviando || !sugerencia.validacion_reglas?.cumple}
