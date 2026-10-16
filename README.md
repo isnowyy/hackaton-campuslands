@@ -74,6 +74,32 @@ hackaton-campuslands/
 └── .env.example                 Variables de entorno sin secretos
 ```
 
+```mermaid
+flowchart LR
+    U["Navegador<br/>React + Vite"] -- "/api (proxy de Vite)" --> A
+
+    subgraph SRV["Servidor Node.js"]
+        A["app.js<br/>rutas, cabeceras de seguridad,<br/>manejador central de errores"] --> S["servicios/<br/>casos de uso + transacciones"]
+        S --> R["reglas/<br/>R1 a R6, funciones puras"]
+        S --> AU["auditoria.js<br/>trazabilidad"]
+        S --> T["ia/triaje.js<br/>instrucciones y validación<br/>de la respuesta"]
+        T --> R
+        A --> I["importacion/<br/>leer, validar, normalizar"]
+        I --> R
+        I --> AU
+    end
+
+    S --> D[("SQLite<br/>data/campus.db")]
+    AU --> D
+    I --> D
+    O[/"data/oficial<br/>CSV, JSON, SQLite"/] -- "solo lectura" --> I
+    T -- "HTTPS" --> G[("Proveedor de IA<br/>Gemini o Claude, según .env")]
+```
+
+Las reglas no dependen de Express ni de la base: reciben datos y aprueban o
+rechazan. Por eso las usan por igual los servicios, el importador y la
+verificación de las sugerencias de IA.
+
 **Por qué este stack:** es el sugerido (React + Vite, Node + Express, SQLite),
 ya estaba instalado y no requiere servicios externos. SQLite se usa con el
 módulo nativo `node:sqlite` para evitar dependencias que haya que compilar. La
@@ -103,7 +129,39 @@ Todas viven en `server/src/reglas/` y se prueban en `server/test/reglas.test.js`
 | **R5 · Integridad de operaciones** | Préstamo con devolución prevista futura; devolución de un préstamo activo | Fin antes del inicio; reservar un horario pasado; doble devolución; cancelar dos veces; pasar a mantenimiento un espacio con reservas futuras; cambiar el estado de un equipo prestado sin registrar la devolución; serial o código duplicado |
 | **R6 · Integridad de incidencias** | abierta → en progreso con clasificación y responsable; resuelta → cerrada con solución | Cerrar una incidencia abierta (salta estados); resolver sin solución; cancelar sin motivo; modificar una cerrada; asignar "Red" a "Servicios generales"; reasignar una en progreso a otra área sin indicar quién la atiende |
 
+Orden de validación de una reserva (`validarNuevaReserva` en `reglasEspacios.js`):
+
+```mermaid
+flowchart TD
+    P["POST /api/espacios/:id/reservas"] --> V{"¿Datos completos<br/>y bien formados?"}
+    V -- No --> E422["422 · Revisa los datos"]
+    V -- Sí --> C5{"R5 · ¿fin posterior al inicio<br/>y el horario no terminó?"}
+    C5 -- No --> X5["409 · R5"]
+    C5 -- Sí --> C3{"R3 · ¿el espacio está<br/>disponible?"}
+    C3 -- No --> X3["409 · R3"]
+    C3 -- Sí --> C1{"R1 · ¿personas ≤ capacidad?"}
+    C1 -- No --> X1["409 · R1"]
+    C1 -- Sí --> C2{"R2 · ¿sin cruce con otra<br/>reserva activa?"}
+    C2 -- No --> X2["409 · R2"]
+    C2 -- Sí --> OK["Reserva + movimiento<br/>en una sola transacción"]
+    X5 & X3 & X1 & X2 --> L["Intento rechazado guardado<br/>en la trazabilidad"]
+```
+
 Máquina de estados de incidencias (`TRANSICIONES_INCIDENCIA` en `catalogos.js`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> abierta : registrar
+    abierta --> en_progreso : clasificada y con persona asignada
+    abierta --> cancelada : con motivo
+    en_progreso --> resuelta : con solución de 10+ caracteres
+    en_progreso --> abierta : devolver a la cola
+    en_progreso --> cancelada : con motivo
+    resuelta --> cerrada : solución registrada
+    resuelta --> en_progreso : reabrir
+    cerrada --> [*]
+    cancelada --> [*]
+```
 
 | Desde | Puede pasar a | Lo que exige |
 |---|---|---|
@@ -130,6 +188,50 @@ Máquina de estados de incidencias (`TRANSICIONES_INCIDENCIA` en `catalogos.js`)
 (y del espacio o equipo relacionado), el modelo propone categoría, prioridad,
 área responsable, justificación, ruta de atención paso a paso, si requiere
 atención inmediata y un nivel de confianza.
+
+```mermaid
+sequenceDiagram
+    actor P as Operador
+    participant UI as Interfaz
+    participant API as API Express
+    participant S as servicios/incidencias.js
+    participant T as ia/triaje.js
+    participant M as Proveedor de IA
+    participant R as reglas (R6)
+    participant DB as SQLite
+
+    P->>UI: Analizar con IA
+    UI->>API: POST /api/incidencias/:id/ia
+    API->>S: analizarConIA(id)
+    S->>T: analizar(título, descripción, espacio, equipo)
+    T->>M: /chat/completions con el modelo principal
+    opt 503 saturado o 429 sin cuota
+        M-->>T: error
+        T->>M: siguiente modelo de IA_MODELO_RESPALDO
+    end
+    M-->>T: JSON
+    T->>T: validarSugerencia (estructura y catálogo)
+    T->>R: validarClasificacion (compatibilidad categoría-área)
+    alt respuesta inválida, tiempo agotado o IA no configurada
+        T-->>UI: error claro y clasificación manual disponible
+    else sugerencia válida
+        S->>DB: sugerencia "pendiente" + movimiento
+        S-->>UI: tarjeta "Sugerencia generada por IA"
+        P->>UI: aplicar, editar o descartar
+        UI->>API: POST /api/incidencias/:id/clasificacion
+        API->>S: clasificar(...)
+        S->>R: validarReclasificacion (R6)
+        alt incumple R6
+            API-->>UI: 409 con la regla y el motivo
+        else cumple
+            S->>DB: clasificación + origen (ia o ia_editada) + movimiento
+        end
+    end
+```
+
+La IA nunca escribe la clasificación: la sugerencia queda "pendiente" hasta
+que una persona decide, y lo que se aplica pasa por la misma regla R6 que una
+clasificación manual.
 
 **Proveedor:** se define solo con variables de entorno (`.env`). No hay
 credenciales ni endpoints escondidos en el código; si no se configura, la IA
@@ -187,6 +289,87 @@ terminada cuando se carguen y revisen los archivos reales.
 ---
 
 ## Persistencia y seguridad
+
+```mermaid
+erDiagram
+    ESPACIOS ||--o{ RESERVAS : "se reserva en"
+    EQUIPOS ||--o{ PRESTAMOS : "se presta en"
+    ESPACIOS |o--o{ INCIDENCIAS : "relacionada con"
+    EQUIPOS |o--o{ INCIDENCIAS : "relacionada con"
+
+    ESPACIOS {
+        TEXT id PK "código, p. ej. A-101"
+        TEXT nombre
+        TEXT tipo "aula o cubiculo"
+        INTEGER capacidad "mayor que 0"
+        TEXT estado "disponible, mantenimiento, inhabilitado"
+        TEXT ubicacion
+        TEXT origen "oficial o manual"
+    }
+    RESERVAS {
+        INTEGER id PK
+        TEXT espacio_id FK
+        TEXT responsable
+        INTEGER personas "mayor que 0"
+        TEXT inicio "YYYY-MM-DDTHH:MM"
+        TEXT fin "posterior a inicio"
+        TEXT estado "activa o cancelada"
+        TEXT motivo_cancelacion
+    }
+    EQUIPOS {
+        TEXT id PK
+        TEXT nombre
+        TEXT tipo
+        TEXT serial UK
+        TEXT estado "operativo, danado, mantenimiento, inhabilitado"
+        TEXT origen
+    }
+    PRESTAMOS {
+        INTEGER id PK
+        TEXT equipo_id FK "un solo préstamo activo por equipo"
+        TEXT responsable
+        TEXT fecha_prestamo
+        TEXT devolucion_prevista
+        TEXT fecha_devolucion "vacía si está activo"
+        TEXT estado "activo o devuelto"
+        TEXT estado_al_devolver
+    }
+    INCIDENCIAS {
+        TEXT id PK "INC-0001"
+        TEXT titulo
+        TEXT descripcion
+        TEXT categoria
+        TEXT prioridad
+        TEXT area_responsable
+        TEXT estado
+        TEXT espacio_id FK
+        TEXT equipo_id FK
+        TEXT asignado_a
+        TEXT solucion
+        TEXT origen_clasificacion "manual, ia, ia_editada, oficial"
+        TEXT ia_sugerencia "JSON de la última sugerencia"
+        TEXT ia_decision "pendiente, aceptada, editada, descartada"
+    }
+    MOVIMIENTOS {
+        INTEGER id PK
+        TEXT fecha
+        TEXT entidad
+        TEXT entidad_id
+        TEXT accion "incluye operacion_rechazada"
+        TEXT detalle "JSON con antes y después"
+        TEXT operador
+    }
+    IMPORTACIONES {
+        INTEGER id PK
+        TEXT fecha
+        TEXT reporte "JSON con conteos, errores y SHA-256"
+    }
+```
+
+"Prestado" no es un estado del equipo: se deduce de que exista un préstamo
+activo, y un índice único impide dos préstamos activos del mismo equipo.
+`movimientos` es un registro independiente (no usa claves foráneas) para que
+la historia se conserve aunque se reimporten los datos.
 
 - **SQLite** con claves foráneas, `CHECK` (capacidad > 0, fin > inicio, préstamo activo sin fecha de devolución), índice único de un préstamo activo por equipo y transacciones en cada operación (operación + trazabilidad, o nada).
 - **Trazabilidad** en la tabla `movimientos`: creación, cambios con valor anterior y nuevo, préstamos, devoluciones, reservas, cancelaciones, sugerencias y fallos de IA, importaciones y **operaciones rechazadas por reglas**, con el operador que las hizo.
